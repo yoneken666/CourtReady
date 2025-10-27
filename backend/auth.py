@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 
 # --- Configuration ---
-SECRET_KEY = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS" # Generate a real secret key
+SECRET_KEY = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS" 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
