@@ -101,6 +101,10 @@ Install all required packages (React, Axios, etc.):
 
 npm install
 
+npm install axios
+
+npm install react-router-dom
+
 
 Step 4.2: Run the Frontend Application
 
