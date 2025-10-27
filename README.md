@@ -1,84 +1,112 @@
-This guide covers setting up the **FastAPI Backend** and **React Frontend** and the database:
+CourtReady Project Setup Guide
 
- 1\. Prerequisites
+This guide covers the complete setup for the FastAPI Backend, React Frontend, and PostgreSQL Database to run the CourtReady application.
 
-Make sure you have the following installed:
+1. Prerequisites
 
-pycharm IDE (recommended)
+Before you begin, make sure you have the following software installed on your system:
 
 Python 3.10+
 
 Node.js & npm
 
-postgresSql
+PostgreSQL (You can download it from postgresql.org)
 
-2\. Backend Setup (FastAPI)
+PyCharm (Recommended IDE)
 
-All the commands below should be run on the terminal from the `practise/backend` directory.
+2. Database Setup
 
-pip install email-validator
+You must install and configure the database before running the backend.
 
-pip install sqlalchemy psycopg2-binary passlib[bcrypt] python-jose[cryptography]
+Install PostgreSQL: Follow the installer. When it asks you to set a password for the postgres user, remember what you set.
 
-Step 2.1: Initialize Python Environment
+Create the Database:
 
-1.  Navigate to the backend folder:
+Open pgAdmin (which installs with PostgreSQL).
 
- cd practise/backend
+Connect to your local server (using the password you just set).
 
-3.  Create/activate the virtual environment (`.venv`):
-   
-   python -m venv .venv (skip if env created already)
-   
-   .\.venv\Scripts\activate
+In the browser panel, right-click Databases > Create > Database...
+
+Enter the database name exactly: courtready_db
+
+Click Save.
+
+3. Backend Setup (FastAPI)
+
+All commands are run from the practise/backend directory.
+
+Step 3.1: Create & Activate Virtual Environment
+
+Open your terminal and navigate to the backend folder:
+
+cd practise/backend
 
 
- Step 2.2: Install All Dependencies
+Create and activate the virtual environment (.venv):
 
- Install the core web framework, server, and file-handling libraries:
- 
- pip install fastapi uvicorn[standard] python-multipart
+python -m venv .venv
+.\.venv\Scripts\activate
 
 
-Step 2.3: Run the Backend Server
+(Your terminal prompt should now show (.venv))
 
-Start the FastAPI server. Keep this terminal window open.
+Step 3.2: Configure Database Connection
 
-cd backend
+Open the file practise/backend/database.py in PyCharm.
+
+Find this line:
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:YOUR_POSTGRES_PASSWORD@localhost/courtready_db"
+
+Replace YOUR_POSTGRES_PASSWORD with the actual password you set during the PostgreSQL installation.
+
+Step 3.3: Install All Python Dependencies
+
+Run these commands one by one. We are installing specific versions of bcrypt and passlib to prevent a known login/signup compatibility error.
+
+# Install core libraries
+pip install fastapi "uvicorn[standard]" python-multipart sqlalchemy psycopg2-binary python-jose[cryptography] email-validator
+
+# Install specific, compatible versions for auth
+pip uninstall -y passlib bcrypt
+pip install bcrypt==4.0.1
+pip install passlib
+
+
+Step 3.4: Run the Backend Server
+
+Start the FastAPI server. On its first successful run, it will automatically create the users table in your database.
 
 uvicorn main:app --reload
 
-install postgres (server password is neoaspect777)
 
-3\. Frontend Setup (React)
+Keep this terminal open and running.
 
-All commands should be run from the `practise/frontend` directory. Use a **NEW terminal window**.
+4. Frontend Setup (React)
 
-Step 3.1: Install Node Dependencies
+Use a NEW terminal window for these commands.
 
-#1.  Navigate to the frontend folder:
+Step 4.1: Install Node Dependencies
+
+Navigate to the frontend folder:
 
 cd practise/frontend
 
-2.  Install all required Node packages:
+
+Install all required packages (React, Axios, etc.):
 
 npm install
 
-Step 3.2: Run the Frontend Application
 
-Start the React development server:
+Step 4.2: Run the Frontend Application
+
+Start the React development server.
 
 npm run dev
 
 
-Step 3.3: Launch
+Keep this terminal open and running.
 
-Open the URL provided by the terminal (e.g., `http://localhost:5173`) in your web browser. The app is now fully functional.
+5. Launch the App
 
-
-my account password: Neo@spect777
-
-fix ver compatibility error casuing signup/login issues:
-pip uninstall passlib bcrypt
-pip install bcrypt==4.0.1
-pip install passlib
+Open the URL provided by the frontend terminal (e.g., http://localhost:5173) in your web browser. You can now sign up for a new account, log in, and use the application.
