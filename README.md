@@ -5,8 +5,11 @@ This guide covers setting up the **FastAPI Backend** and **React Frontend** and 
 Make sure you have the following installed:
 
 pycharm IDE (recommended)
+
 Python 3.10+
+
 Node.js & npm
+
 postgresSql
 
 2\. Backend Setup (FastAPI)
@@ -14,28 +17,35 @@ postgresSql
 All the commands below should be run on the terminal from the `practise/backend` directory.
 
 pip install email-validator
+
 pip install sqlalchemy psycopg2-binary passlib[bcrypt] python-jose[cryptography]
 
 Step 2.1: Initialize Python Environment
 
 1.  Navigate to the backend folder:
-    cd practise/backend
 
-2.  Create/activate the virtual environment (`.venv`):
+ cd practise/backend
+
+3.  Create/activate the virtual environment (`.venv`):
+   
    python -m venv .venv (skip if env created already)
+   
    .\.venv\Scripts\activate
 
 
  Step 2.2: Install All Dependencies
 
  Install the core web framework, server, and file-handling libraries:
+ 
  pip install fastapi uvicorn[standard] python-multipart
 
 
 Step 2.3: Run the Backend Server
+
 Start the FastAPI server. Keep this terminal window open.
 
 cd backend
+
 uvicorn main:app --reload
 
 install postgres (server password is neoaspect777)
@@ -45,16 +55,19 @@ install postgres (server password is neoaspect777)
 All commands should be run from the `practise/frontend` directory. Use a **NEW terminal window**.
 
 Step 3.1: Install Node Dependencies
+
 #1.  Navigate to the frontend folder:
 
 cd practise/frontend
 
 2.  Install all required Node packages:
+
 npm install
 
 Step 3.2: Run the Frontend Application
 
 Start the React development server:
+
 npm run dev
 
 
