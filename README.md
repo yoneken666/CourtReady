@@ -64,10 +64,10 @@ Step 3.3: Install All Python Dependencies
 
 Run these commands one by one. We are installing specific versions of bcrypt and passlib to prevent a known login/signup compatibility error.
 
-# Install core libraries
+Install core libraries
 pip install fastapi "uvicorn[standard]" python-multipart sqlalchemy psycopg2-binary python-jose[cryptography] email-validator
 
-# Install specific, compatible versions for auth
+Install specific, compatible versions for auth
 pip uninstall -y passlib bcrypt
 pip install bcrypt==4.0.1
 pip install passlib
