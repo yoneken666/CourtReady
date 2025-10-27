@@ -42,12 +42,11 @@ Open your terminal and navigate to the backend folder:
 
 cd practise/backend
 
-
 Create and activate the virtual environment (.venv):
 
 python -m venv .venv
-.\.venv\Scripts\activate
 
+.\.venv\Scripts\activate
 
 (Your terminal prompt should now show (.venv))
 
@@ -56,6 +55,7 @@ Step 3.2: Configure Database Connection
 Open the file practise/backend/database.py in PyCharm.
 
 Find this line:
+
 SQLALCHEMY_DATABASE_URL = "postgresql://postgres:YOUR_POSTGRES_PASSWORD@localhost/courtready_db"
 
 Replace YOUR_POSTGRES_PASSWORD with the actual password you set during the PostgreSQL installation.
@@ -65,11 +65,15 @@ Step 3.3: Install All Python Dependencies
 Run these commands one by one. We are installing specific versions of bcrypt and passlib to prevent a known login/signup compatibility error.
 
 Install core libraries
+
 pip install fastapi "uvicorn[standard]" python-multipart sqlalchemy psycopg2-binary python-jose[cryptography] email-validator
 
 Install specific, compatible versions for auth
+
 pip uninstall -y passlib bcrypt
+
 pip install bcrypt==4.0.1
+
 pip install passlib
 
 
