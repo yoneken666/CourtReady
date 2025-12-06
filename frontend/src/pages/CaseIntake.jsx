@@ -28,16 +28,12 @@ function CaseIntake() {
   const [message, setMessage] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
-  // Ref for the hidden file input
+  // New state to store AI results
+  const [analysisResult, setAnalysisResult] = useState(null);
+
   const fileInputRef = useRef(null);
 
-  // --- BUG FIX ---
-  // The 'e.g.value' was a critical error.
-  // It has been corrected to 'e.target.value'.
-  // ---
-
   const handleFileChange = (newFiles) => {
-    // Combine new files with existing, avoiding duplicates
     setFiles((prevFiles) => {
       const existingFileNames = new Set(prevFiles.map(f => f.name));
       const filteredNewFiles = Array.from(newFiles).filter(
@@ -70,41 +66,38 @@ function CaseIntake() {
     setFiles(files.filter(file => file.name !== fileName));
   };
 
-  // Triggers the hidden file input
   const triggerFileInput = () => {
     fileInputRef.current.click();
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setMessage('Submitting case details...');
+    setMessage('Submitting & Analyzing...');
+    setAnalysisResult(null); // Clear previous results
 
-    // 1. Submit text data
     const caseDetails = { caseTitle, caseType, caseDescription };
     try {
-      const textResponse = await createCase(caseDetails);
-      console.log('Case details submitted:', textResponse);
+      const response = await createCase(caseDetails);
+      console.log('Backend Response:', response);
 
-      // 2. If text submission is successful and files exist, upload files
-      if (files.length > 0) {
-        setMessage('Uploading documents...');
-        const formData = new FormData();
-        files.forEach((file) => {
-          formData.append('files', file);
-        });
-
-        const fileResponse = await uploadDocuments(formData);
-        console.log('Files uploaded:', fileResponse);
-        setMessage('Case and documents submitted successfully!');
-      } else {
-        setMessage('Case details submitted successfully!');
+      // --- NEW: Save AI Analysis Result ---
+      if (response.ai_analysis) {
+          setAnalysisResult(response.ai_analysis);
       }
 
-      // Clear the form
-      setCaseTitle('');
-      setCaseType('');
-      setCaseDescription('');
-      setFiles([]);
+      const newCaseId = response.id;
+
+      if (files.length > 0) {
+        setMessage('Case analyzed. Uploading documents...');
+        const fileResponse = await uploadDocuments(newCaseId, files);
+        console.log('Files uploaded:', fileResponse);
+        setMessage('Analysis complete & Documents uploaded!');
+      } else {
+        setMessage('Analysis complete!');
+      }
+
+      // Optional: Clear form or keep it for reference
+      // setCaseTitle(''); setCaseType(''); ...
 
     } catch (error) {
       console.error('Submission error:', error);
@@ -122,21 +115,17 @@ function CaseIntake() {
         <div className="hero-left">
           <h2>Case Analyzer</h2>
           <p>
-            Provide details about your case and upload any relevant documents.
-            Our AI will analyze the information to provide you with a strategic
-            roadmap.
+            Provide details about your case. Our AI will identify key legal issues
+            and find relevant Pakistani precedents.
           </p>
         </div>
       </div>
 
-      {/* This structure uses the .card and .form classes on the
-        outer wrapper, as defined in your App.css file.
-      */}
       <div className="card form fade-in-up delay-1">
         <form onSubmit={handleSubmit}>
-
+          <h4 style={{ marginBottom: '20px' }}>Case Details</h4>
           <div className="field">
-            <label style={{ color: 'var(--olive)' }}>Case Name</label>
+            <label>Case Title</label>
             <input
               type="text"
               placeholder="e.g., Land Dispute in Sector G-11"
@@ -146,7 +135,7 @@ function CaseIntake() {
             />
           </div>
           <div className="field">
-            <label style={{ color: 'var(--olive)' }}>Case type</label>
+            <label>Case Type</label>
             <input
               type="text"
               placeholder="e.g., Civil, Family, Property"
@@ -156,7 +145,7 @@ function CaseIntake() {
             />
           </div>
           <div className="field">
-              <label style={{ color: 'var(--olive)' }}>Case Description</label>
+            <label>Case Description</label>
             <textarea
               rows="6"
               placeholder="Briefly describe the situation, key events, and what you are seeking."
@@ -168,30 +157,27 @@ function CaseIntake() {
 
           <h4 style={{ marginTop: '10px', marginBottom: '20px' }}>Upload Documents</h4>
           <div className="field">
-            {/* New Drag and Drop Zone */}
             <div
               className={`file-drop-zone ${isDragging ? 'dragging' : ''}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={triggerFileInput} // Click to upload
+              onClick={triggerFileInput}
             >
               <UploadIcon />
               <p>Drag & drop files here</p>
-              <span>or click to browse (PDFs, images, etc.)</span>
+              <span>or click to browse (PDFs, Word Docs)</span>
             </div>
-            {/* Hidden file input */}
             <input
               type="file"
               ref={fileInputRef}
               onChange={(e) => handleFileChange(e.target.files)}
               multiple
               className="file-input-hidden"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              accept=".pdf,.doc,.docx"
             />
           </div>
 
-          {/* New, styled file list */}
           {files.length > 0 && (
             <div className="file-list">
               {files.map((file, index) => (
@@ -200,7 +186,7 @@ function CaseIntake() {
                     <FileIcon />
                     <span className="file-name">{file.name}</span>
                   </div>
-                  <span classNameG="file-size">
+                  <span className="file-size">
                     ({(file.size / 1024).toFixed(1)} KB)
                     <button
                       type="button"
@@ -226,6 +212,40 @@ function CaseIntake() {
         </form>
       </div>
 
+      {/* --- NEW SECTION: Display AI Analysis Results --- */}
+      {analysisResult && (
+        <div className="card fade-in-up delay-2" style={{ marginTop: '20px', borderTop: '4px solid var(--olive)' }}>
+          <h3 style={{ color: 'var(--olive)', marginBottom: '15px' }}>AI Legal Analysis</h3>
+
+          <div style={{ background: '#f9fcf9', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>Key Insights & Issues</h4>
+            <p style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>{analysisResult.analysis}</p>
+          </div>
+
+          {analysisResult.matches && analysisResult.matches.length > 0 && (
+            <div>
+              <h4 style={{ marginBottom: '15px' }}>Relevant Pakistani Precedents</h4>
+              <div className="grid">
+                {analysisResult.matches.map((match, idx) => (
+                  <div key={idx} style={{
+                      background: 'white',
+                      border: '1px solid #eee',
+                      padding: '15px',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                  }}>
+                    <h5 style={{ margin: '0 0 8px 0', color: 'var(--olive-dark)' }}>Similar Case #{idx + 1}</h5>
+                    <p style={{ fontSize: '13px', color: '#555', fontStyle: 'italic' }}>
+                      "...{match.preview}..."
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <footer>
         CourtReady FYP - All Rights Reserved © 2025
       </footer>
@@ -234,4 +254,3 @@ function CaseIntake() {
 }
 
 export default CaseIntake;
-

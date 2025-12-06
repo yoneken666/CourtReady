@@ -9,6 +9,7 @@
 # pycharm IDE
 # * Python 3.10+
 # * Node.js & npm
+
 # postgreSql
 
 
@@ -88,4 +89,11 @@
 # fix ver compatibility error casuing signup/login issues:
 # pip uninstall passlib bcrypt
 # pip install bcrypt==4.0.1
-# pip install passlib
+# pip install passlibnp
+
+# UPDATE AFTER MID EVALUATION
+
+# IN BACKEND DIRECTORY:
+#pip install pypdf python-docx
+#pip install torch transformers numpy faiss-cpu
+#pip install datasets
