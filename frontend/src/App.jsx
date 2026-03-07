@@ -9,7 +9,7 @@ import Placeholder from './pages/Placeholder';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import ProtectedRoute from './components/ProtectedRoute'; // Import the protector
-
+import DocumentAssistant from './pages/DocumentAssistant'; // Import the new Document Assistant
 import './App.css';
 
 function App() {
