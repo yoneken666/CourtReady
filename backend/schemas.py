@@ -1,49 +1,60 @@
-from pydantic import BaseModel, EmailStr, field_validator, Field
-from typing import List, Optional
-import re
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
+from datetime import datetime
 
-# ... (User schemas remain the same) ...
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8)
-    @field_validator('password')
-    @classmethod
-    def password_complexity(cls, v: str) -> str:
-        if not re.search(r"[A-Z]", v): raise ValueError("Need uppercase")
-        if not re.search(r"[a-z]", v): raise ValueError("Need lowercase")
-        if not re.search(r"[0-9]", v): raise ValueError("Need digit")
-        if not re.search(r"[!@#$%^&*(),.?:{}|<>_~-]", v): raise ValueError("Need special char")
-        return v
 
-class UserLogin(BaseModel):
-    email: EmailStr
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(UserBase):
     password: str
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+class TokenData(BaseModel):
+    email: Optional[str] = None
+
+# --- CASE SCHEMAS ---
+
 class CaseIntake(BaseModel):
     caseTitle: str
     caseType: str
     caseDescription: str
 
-# --- NEW: AI Response Models ---
-class CaseMatch(BaseModel):
-    preview: str
-    full_text: str
-
-class CaseAnalysisResponse(BaseModel):
-    status: str
-    analysis: Optional[str] = None
-    matches: Optional[List[CaseMatch]] = []
-    message: Optional[str] = None
-
-class CaseResponse(CaseIntake):
+class CaseResponse(BaseModel):
     id: int
+    caseTitle: str
+    caseType: str
+    caseDescription: str
     owner_email: str
-    # Add AI analysis to the response
-    ai_analysis: Optional[CaseAnalysisResponse] = None
 
     class Config:
         from_attributes = True
+
+# --- ANALYSIS SCHEMAS ---
+
+class AnalysisRequest(BaseModel):
+    caseTitle: str
+    caseType: str
+    caseDescription: str
+
+class RelevantLaw(BaseModel):
+    source_text: str
+    relevance_score: float
+    source_category: str
+
+class ValidityAssessment(BaseModel):
+    risk_level: str
+    advice_summary: str
+    simplified_advice: str # Task 2: New field for layman explanation
+
+class AnalysisResponse(BaseModel):
+    case_summary: str
+    key_facts: List[str]
+    relevant_laws: List[RelevantLaw]
+    validity_status: str
+    validity_assessment: ValidityAssessment
