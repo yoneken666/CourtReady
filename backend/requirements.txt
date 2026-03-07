@@ -95,5 +95,9 @@
 
 # IN BACKEND DIRECTORY:
 #pip install pypdf python-docx
-#pip install torch transformers numpy faiss-cpu
-#pip install datasets
+#pip install torch transformers numpy
+#pip install datasets sentence-transformers google-generativeai
+
+# IN FRONTEND DIRECTORY:
+#npm install jspdf
+
