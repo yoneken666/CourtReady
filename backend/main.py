@@ -3,22 +3,25 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, status, F
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import os
 import shutil
 import pypdf
 import docx
+import re
+from dotenv import load_dotenv
+from starlette.concurrency import run_in_threadpool
+
+load_dotenv()
 
 import models, schemas, auth
 from database import engine, get_db
-# --- IMPORT AI SERVICE ---
-from ai_service import ai_system
+from ai_engine import legal_engine
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(debug=True)
 
-# ... (CORS and UPLOAD_DIRECTORY remain the same) ...
 origins = ["http://localhost:5173"]
 app.add_middleware(
     CORSMiddleware,
@@ -27,31 +30,50 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 UPLOAD_DIRECTORY = "./uploaded_files"
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
 
-# ... (Text extraction helper and Auth endpoints remain the same) ...
-def extract_text_from_file(file_path: str, content_type: str) -> str:
-    text = ""
-    try:
-        if "pdf" in content_type or file_path.endswith(".pdf"):
-            reader = pypdf.PdfReader(file_path)
-            for page in reader.pages:
-                extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
-        elif "word" in content_type or "officedocument" in content_type or file_path.endswith(".docx"):
-            doc = docx.Document(file_path)
-            text = "\n".join([para.text for para in doc.paragraphs])
-        else:
-            return ""
-    except Exception as e:
-        print(f"Error extracting text from {file_path}: {e}")
+# --- Helper Functions ---
+def clean_extracted_text(text: str) -> str:
+    """Removes null bytes and excessive whitespace to prevent AI errors."""
+    if not text:
         return ""
+    # Remove null bytes (common in PDFs) and non-printable chars
+    text = text.replace("\x00", "")
+    # Collapse multiple spaces/newlines into single ones
+    text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
+def extract_text_from_file_obj(file_obj, filename: str) -> str:
+    text = ""
+    try:
+        file_obj.seek(0)  # Ensure we read from the beginning
+
+        if filename.endswith(".pdf"):
+            reader = pypdf.PdfReader(file_obj)
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + " "
+        elif filename.endswith(".docx"):
+            doc = docx.Document(file_obj)
+            text = "\n".join([para.text for para in doc.paragraphs])
+
+        return clean_extracted_text(text)
+    except Exception as e:
+        print(f"Error extracting text from {filename}: {e}")
+        return ""
+
+
+def extract_text_from_file(file_path: str, content_type: str) -> str:
+    with open(file_path, "rb") as f:
+        return extract_text_from_file_obj(f, file_path)
+
+
+# --- AUTH ENDPOINTS ---
 @app.post("/api/signup", status_code=status.HTTP_201_CREATED)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -75,8 +97,50 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-# --- UPDATED: Protected Case Endpoint with AI ---
+# --- AI ANALYSIS ENDPOINT ---
+@app.post("/api/analyze-case", response_model=schemas.AnalysisResponse)
+async def analyze_case(
+        caseTitle: str = Form(...),
+        caseType: str = Form(...),
+        caseDescription: str = Form(...),
+        file: Optional[UploadFile] = File(None),
+        current_user: dict = Depends(auth.get_current_user)
+):
+    ALLOWED_CATEGORIES = ["Contract Disputes", "Property Disputes", "Family Disputes"]
+    if caseType not in ALLOWED_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Invalid Case Type.")
 
+    full_description = caseDescription
+
+    if file:
+        print(f"Processing attached file: {file.filename}")
+        extracted_text = extract_text_from_file_obj(file.file, file.filename)
+
+        # Only append if valid text was found
+        if extracted_text and len(extracted_text) > 10:
+            # Truncate if excessively large to be safe (e.g., 50k chars)
+            # Gemini Flash context is huge (1M tokens), but let's be reasonable for speed
+            limit = 50000
+            if len(extracted_text) > limit:
+                extracted_text = extracted_text[:limit] + "... [Text Truncated]"
+
+            full_description += f"\n\n[Attached Document Content]:\n{extracted_text}"
+        else:
+            print("Warning: Extracted text was empty or too short.")
+
+    try:
+        result = await run_in_threadpool(
+            legal_engine.analyze_case,
+            description=full_description,
+            category=caseType
+        )
+        return schemas.AnalysisResponse(**result)
+    except Exception as e:
+        print(f"Analysis Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+# --- CASE MANAGEMENT ENDPOINTS ---
 @app.post("/api/case", response_model=schemas.CaseResponse)
 def create_case(
         case_details: schemas.CaseIntake,
@@ -87,7 +151,6 @@ def create_case(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 1. Save Case to DB
     new_case = models.Case(
         title=case_details.caseTitle,
         case_type=case_details.caseType,
@@ -98,23 +161,15 @@ def create_case(
     db.commit()
     db.refresh(new_case)
 
-    # 2. RUN AI ANALYSIS
-    # We combine title + description for the AI query
-    query_text = f"{case_details.caseTitle} {case_details.caseDescription}"
-    ai_result = ai_system.analyze_case(query_text)
-
-    # 3. Return combined response
     return {
         "caseTitle": new_case.title,
         "caseType": new_case.case_type,
         "caseDescription": new_case.description,
         "id": new_case.id,
-        "owner_email": user.email,
-        "ai_analysis": ai_result
+        "owner_email": user.email
     }
 
 
-# ... (Upload documents endpoint remains same as previous version) ...
 @app.post("/api/upload-documents")
 def upload_documents(
         case_id: int = Form(...),
@@ -131,13 +186,6 @@ def upload_documents(
     saved_files = []
 
     for file in files:
-        allowed_types = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
-        if file.content_type not in allowed_types and not file.filename.endswith(('.pdf', '.docx')):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid file type: {file.filename}. Please upload only Word (.docx) or PDF documents."
-            )
-
         file_path = os.path.join(UPLOAD_DIRECTORY, f"case_{case_id}_{file.filename}")
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -151,7 +199,7 @@ def upload_documents(
             case_id=case.id
         )
         db.add(new_doc)
-        saved_files.append({"filename": file.filename, "extracted_chars": len(extracted_text)})
+        saved_files.append({"filename": file.filename})
 
     db.commit()
     return {"status": "success", "saved_files": saved_files}
