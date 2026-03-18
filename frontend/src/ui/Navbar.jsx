@@ -16,7 +16,8 @@ function Navbar() {
                 <nav>
                     <NavLink to="/">Home</NavLink>
                     <NavLink to="/case-intake">Case Analyzer</NavLink>
-                    <NavLink to="/case-matching">Case Matcher</NavLink>   {/* ← NEW */}
+                    <NavLink to="/case-matching">Case Matcher</NavLink>
+                    <NavLink to="/argument-builder">Argument Builder</NavLink>
                     <NavLink to="/document-assistant">Document Assistant</NavLink>
                     <NavLink to="/simulation">Simulation Mode</NavLink>
 
