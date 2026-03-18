@@ -16,7 +16,8 @@ load_dotenv()
 
 import models, schemas, auth
 from database import engine, get_db
-from ai_engine import legal_engine
+from caseanalyzer import legal_engine
+from casematching import find_similar_cases          # ← NEW
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -40,9 +41,7 @@ def clean_extracted_text(text: str) -> str:
     """Removes null bytes and excessive whitespace to prevent AI errors."""
     if not text:
         return ""
-    # Remove null bytes (common in PDFs) and non-printable chars
     text = text.replace("\x00", "")
-    # Collapse multiple spaces/newlines into single ones
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -50,7 +49,7 @@ def clean_extracted_text(text: str) -> str:
 def extract_text_from_file_obj(file_obj, filename: str) -> str:
     text = ""
     try:
-        file_obj.seek(0)  # Ensure we read from the beginning
+        file_obj.seek(0)
 
         if filename.endswith(".pdf"):
             reader = pypdf.PdfReader(file_obj)
@@ -116,10 +115,7 @@ async def analyze_case(
         print(f"Processing attached file: {file.filename}")
         extracted_text = extract_text_from_file_obj(file.file, file.filename)
 
-        # Only append if valid text was found
         if extracted_text and len(extracted_text) > 10:
-            # Truncate if excessively large to be safe (e.g., 50k chars)
-            # Gemini Flash context is huge (1M tokens), but let's be reasonable for speed
             limit = 50000
             if len(extracted_text) > limit:
                 extracted_text = extracted_text[:limit] + "... [Text Truncated]"
@@ -138,6 +134,32 @@ async def analyze_case(
     except Exception as e:
         print(f"Analysis Error: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+# --- CASE MATCHING ENDPOINT ---                                               ← NEW
+@app.post("/api/match-cases", response_model=schemas.CaseMatchResponse)
+async def match_cases(
+        caseTitle: str = Form(...),
+        caseDescription: str = Form(...),
+        file: Optional[UploadFile] = File(None),
+        current_user: dict = Depends(auth.get_current_user)
+):
+    """
+    Accepts a family dispute description (and optional supporting document),
+    finds the top-5 most keyword-similar past cases from ./family_cases/,
+    then uses Gemini to contextually rank and filter them.
+    Returns up to 3 genuinely similar cases with relevance labels and explanations.
+    """
+    full_description = caseDescription
+
+    if file:
+        print(f"[match-cases] Processing attached file: {file.filename}")
+        extracted = extract_text_from_file_obj(file.file, file.filename)
+        if extracted and len(extracted) > 10:
+            full_description += f"\n\n[Attached Document]:\n{extracted[:30000]}"
+
+    result = await run_in_threadpool(find_similar_cases, full_description)
+    return result
 
 
 # --- CASE MANAGEMENT ENDPOINTS ---
