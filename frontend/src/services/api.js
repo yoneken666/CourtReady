@@ -48,21 +48,16 @@ export const createCase = async (caseDetails) => {
         const response = await authApiClient.post('/api/case', caseDetails, {
             headers: getAuthHeaders(),
         });
-        return response.data; // Now includes 'id'
+        return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.detail || 'Failed to create case');
     }
 };
 
-// Updated to accept caseId
 export const uploadDocuments = async (caseId, files) => {
     const formData = new FormData();
-    // Append the case_id so the backend knows where these files belong
     formData.append('case_id', caseId);
-
-    files.forEach(file => {
-        formData.append('files', file);
-    });
+    files.forEach(file => formData.append('files', file));
 
     try {
         const response = await axios.post(`${API_BASE_URL}/api/upload-documents`, formData, {
@@ -74,5 +69,34 @@ export const uploadDocuments = async (caseId, files) => {
         return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.detail || 'Failed to upload documents');
+    }
+};
+
+export const analyzeCase = async (formData) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/analyze-case`, formData, {
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.detail || 'Failed to analyze case');
+    }
+};
+
+// ── NEW: Case Matching ────────────────────────────────────────────────────────
+export const matchCases = async (formData) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/match-cases`, formData, {
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.detail || 'Failed to search for similar cases');
     }
 };
