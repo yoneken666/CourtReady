@@ -8,7 +8,8 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import DocumentAssistant from './pages/DocumentAssistant';
-import CaseMatching from './pages/CaseMatching';   // ← NEW
+import CaseMatching from './pages/CaseMatching';
+import ArgumentBuilder from './pages/ArgumentBuilder';
 import './App.css';
 
 function App() {
@@ -35,7 +36,7 @@ function App() {
                         path="/document-assistant"
                         element={
                             <ProtectedRoute>
-                                <Placeholder pageName="Document Assistant" />
+                                <DocumentAssistant />
                             </ProtectedRoute>
                         }
                     />
@@ -44,6 +45,14 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <CaseMatching />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/argument-builder"
+                        element={
+                            <ProtectedRoute>
+                                <ArgumentBuilder />
                             </ProtectedRoute>
                         }
                     />
