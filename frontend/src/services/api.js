@@ -39,7 +39,7 @@ export const loginUser = async (email, password) => {
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
-    if (!token) throw new Error("No auth token found. Please log in.");
+    if (!token) throw new Error('No auth token found. Please log in.');
     return { Authorization: `Bearer ${token}` };
 };
 
@@ -86,7 +86,7 @@ export const analyzeCase = async (formData) => {
     }
 };
 
-// ── NEW: Case Matching ────────────────────────────────────────────────────────
+// ── Case Matching ─────────────────────────────────────────────────────────────
 export const matchCases = async (formData) => {
     try {
         const response = await axios.post(`${API_BASE_URL}/api/match-cases`, formData, {
@@ -98,5 +98,25 @@ export const matchCases = async (formData) => {
         return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.detail || 'Failed to search for similar cases');
+    }
+};
+
+// ── Argument Builder ──────────────────────────────────────────────────────────
+export const buildArguments = async ({ caseDescription, analysisResult, matchingResult }) => {
+    const formData = new FormData();
+    formData.append('caseDescription', caseDescription);
+    formData.append('analysisResult',  analysisResult);
+    formData.append('matchingResult',  matchingResult);
+
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/build-arguments`, formData, {
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.detail || 'Failed to generate arguments');
     }
 };
