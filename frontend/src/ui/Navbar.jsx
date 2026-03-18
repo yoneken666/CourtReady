@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AuthContext } from '../services/auth.jsx'; // Import auth context
+import { AuthContext } from '../services/auth.jsx';
 import Emblem from './Emblem';
 
 function Navbar() {
@@ -16,10 +16,10 @@ function Navbar() {
                 <nav>
                     <NavLink to="/">Home</NavLink>
                     <NavLink to="/case-intake">Case Analyzer</NavLink>
+                    <NavLink to="/case-matching">Case Matcher</NavLink>   {/* ← NEW */}
                     <NavLink to="/document-assistant">Document Assistant</NavLink>
                     <NavLink to="/simulation">Simulation Mode</NavLink>
 
-                    {/* Conditional Login/Logout Links */}
                     {token ? (
                         <button onClick={logout} className="btn-nav-logout">
                             Logout
@@ -37,4 +37,3 @@ function Navbar() {
 }
 
 export default Navbar;
-
