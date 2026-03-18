@@ -21,13 +21,14 @@ function UploadIcon() {
 function CaseIntake() {
   const navigate = useNavigate();
 
-  const [caseTitle, setCaseTitle] = useState('');
-  const [caseType, setCaseType] = useState('Contract Disputes');
+  const [caseTitle, setCaseTitle]           = useState('');
+  const [caseType, setCaseType]             = useState('Contract Disputes');
   const [caseDescription, setCaseDescription] = useState('');
-  const [files, setFiles] = useState([]);
-  const [message, setMessage] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [files, setFiles]                   = useState([]);
+  const [message, setMessage]               = useState('');
+  const [isDragging, setIsDragging]         = useState(false);
+  const [isAnalyzing, setIsAnalyzing]       = useState(false);
+  const [isSaving, setIsSaving]             = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
 
   const fileInputRef = useRef(null);
@@ -35,21 +36,19 @@ function CaseIntake() {
   const allowedCategories = [
     "Contract Disputes",
     "Property Disputes",
-    "Family Disputes"
+    "Family Disputes",
   ];
 
-  // --- FILE HANDLING ---
+  // ── File handling ─────────────────────────────────────────────────────────
   const handleFileChange = (newFiles) => {
     setFiles((prevFiles) => {
       const existingFileNames = new Set(prevFiles.map(f => f.name));
-      const filteredNewFiles = Array.from(newFiles).filter(
-        (file) => !existingFileNames.has(file.name)
-      );
-      return [...prevFiles, ...filteredNewFiles];
+      const filtered = Array.from(newFiles).filter(f => !existingFileNames.has(f.name));
+      return [...prevFiles, ...filtered];
     });
   };
 
-  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragOver  = (e) => { e.preventDefault(); setIsDragging(true);  };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e) => {
     e.preventDefault();
@@ -59,62 +58,82 @@ function CaseIntake() {
   const handleRemoveFile = (fileName) => setFiles(files.filter(f => f.name !== fileName));
   const triggerFileInput = () => fileInputRef.current.click();
 
-  // --- ANALYSIS LOGIC ---
+  // ── Analysis ──────────────────────────────────────────────────────────────
   const handleAnalyze = async (e) => {
     e.preventDefault();
     setIsAnalyzing(true);
     setMessage('');
     setAnalysisResult(null);
 
-    // Allow analysis if text exists OR if a file is uploaded
     if (caseDescription.length < 10 && files.length === 0) {
-        setMessage("Error: Please provide a description or upload a document to analyze.");
-        setIsAnalyzing(false);
-        return;
+      setMessage('Error: Please provide a description or upload a document to analyze.');
+      setIsAnalyzing(false);
+      return;
     }
 
     try {
-        const formData = new FormData();
-        formData.append('caseTitle', caseTitle);
-        formData.append('caseType', caseType);
-        formData.append('caseDescription', caseDescription);
+      const formData = new FormData();
+      formData.append('caseTitle',       caseTitle);
+      formData.append('caseType',        caseType);
+      formData.append('caseDescription', caseDescription);
+      if (files.length > 0) formData.append('file', files[0]);
 
-        // Task 3: Attach the first file for analysis if present
-        if (files.length > 0) {
-            formData.append('file', files[0]);
-        }
+      const response = await analyzeCase(formData);
 
-        const response = await analyzeCase(formData);
+      if (response.validity_status === 'REJECTED') {
+        setMessage('Case Analysis Rejected: Input does not match the selected category.');
+      }
 
-        if (response.validity_status === "REJECTED") {
-            setMessage("Case Analysis Rejected: Input does not match the selected category.");
-        }
-
-        setAnalysisResult(response);
+      setAnalysisResult(response);
     } catch (err) {
-        console.error("Analysis failed", err);
-        setMessage(`Analysis Error: ${err.message || "Failed to analyze case."}`);
+      console.error('Analysis failed', err);
+      setMessage(`Analysis Error: ${err.message || 'Failed to analyze case.'}`);
     } finally {
-        setIsAnalyzing(false);
+      setIsAnalyzing(false);
     }
   };
 
+  // ── Save & Proceed to Case Matching ───────────────────────────────────────
   const handleSaveAndProceed = async () => {
-    setMessage('Saving case and uploading documents...');
+    setIsSaving(true);
+    setMessage('Saving case…');
+
     try {
-      const caseDetails = { caseTitle, caseType, caseDescription };
+      // Persist case to DB
+      const caseDetails  = { caseTitle, caseType, caseDescription };
       const caseResponse = await createCase(caseDetails);
-      if (files.length > 0) {
-        await uploadDocuments(caseResponse.id, files);
-      }
-      setMessage('Case saved successfully! Redirecting...');
-      setTimeout(() => navigate('/'), 1500);
+      if (files.length > 0) await uploadDocuments(caseResponse.id, files);
+
+      // Save analyzer results to sessionStorage so ArgumentBuilder can read them
+      sessionStorage.setItem(
+        'caseAnalyzerData',
+        JSON.stringify({
+          caseTitle,
+          caseType,
+          caseDescription,
+          analysisResult,
+        })
+      );
+
+      // Clear any stale matching result so ArgumentBuilder knows it's not done yet
+      sessionStorage.removeItem('caseMatchingData');
+
+      setMessage('Case saved! Redirecting to Case Matcher…');
+
+      // Navigate to Case Matching, passing the description as location state
+      setTimeout(() => {
+        navigate('/case-matching', {
+          state: { caseTitle, caseDescription },
+        });
+      }, 800);
     } catch (error) {
       setMessage(`Error: ${error.message}. Please try again.`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // --- STYLES ---
+  // ── Styles ────────────────────────────────────────────────────────────────
   const styles = {
     resultBox: {
       backgroundColor: '#fff',
@@ -122,64 +141,49 @@ function CaseIntake() {
       borderRadius: '8px',
       marginTop: '2rem',
       boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-      borderTop: '4px solid #0056b3'
+      borderTop: '4px solid #0056b3',
     },
     heading: {
       color: '#2c3e50',
       marginBottom: '1rem',
       borderBottom: '2px solid #ecf0f1',
-      paddingBottom: '0.5rem'
+      paddingBottom: '0.5rem',
     },
     subHeading: {
       fontSize: '1.1rem',
       fontWeight: 'bold',
       color: '#34495e',
       marginTop: '1.5rem',
-      marginBottom: '0.5rem'
+      marginBottom: '0.5rem',
     },
-    badge: {
-      display: 'inline-block',
-      padding: '0.5rem 1rem',
-      borderRadius: '4px',
-      fontWeight: 'bold',
-      fontSize: '0.9rem',
-      marginRight: '1rem',
-      backgroundColor: '#ecf0f1',
-      color: '#2c3e50'
-    },
-    badgeGreen: { backgroundColor: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' },
+    badge:       { display: 'inline-block', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.9rem', marginRight: '1rem', backgroundColor: '#ecf0f1', color: '#2c3e50' },
+    badgeGreen:  { backgroundColor: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' },
     badgeYellow: { backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba' },
-    badgeRed: { backgroundColor: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' },
-    list: { paddingLeft: '20px', color: '#555' },
+    badgeRed:    { backgroundColor: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' },
+    list:        { paddingLeft: '20px', color: '#555' },
     adviceBox: {
       backgroundColor: '#e8f4fd',
       padding: '1.5rem',
       borderRadius: '6px',
       borderLeft: '4px solid #3498db',
-      marginTop: '1rem'
+      marginTop: '1rem',
     },
-    // Task 2: Style for Simplified Advice
     simplifiedBox: {
       backgroundColor: '#f0f9f4',
       padding: '1.5rem',
       borderRadius: '6px',
       borderLeft: '4px solid #27ae60',
-      marginTop: '1rem'
+      marginTop: '1rem',
     },
-    // Task 1: Render newlines as paragraphs
-    formattedText: {
-        whiteSpace: 'pre-line',
-        color: '#2c3e50',
-        lineHeight: '1.6'
-    }
+    formattedText: { whiteSpace: 'pre-line', color: '#2c3e50', lineHeight: '1.6' },
   };
 
   const getStatusStyle = (status) => {
     if (!status) return styles.badge;
     const s = status.toLowerCase();
-    if (s.includes("high") || s.includes("strong")) return { ...styles.badge, ...styles.badgeGreen };
-    if (s.includes("moderate")) return { ...styles.badge, ...styles.badgeYellow };
-    if (s.includes("rejected") || s.includes("error") || s.includes("weak")) return { ...styles.badge, ...styles.badgeRed };
+    if (s.includes('high') || s.includes('strong'))  return { ...styles.badge, ...styles.badgeGreen  };
+    if (s.includes('moderate'))                       return { ...styles.badge, ...styles.badgeYellow };
+    if (s.includes('rejected') || s.includes('error') || s.includes('weak')) return { ...styles.badge, ...styles.badgeRed };
     return styles.badge;
   };
 
@@ -187,10 +191,11 @@ function CaseIntake() {
     <div className="container">
       <div className="hero fade-in-up">
         <div className="hero-left">
-          <h2>Case Analyzer & Intake</h2>
+          <h2>Case Analyzer &amp; Intake</h2>
           <p>
-            Describe your dispute or upload a document to let our AI check its validity against Pakistani Law.
-            Once analyzed, you can save the case and proceed.
+            Describe your dispute or upload a document to let our AI check its
+            validity against Pakistani Law. Once analyzed, save and proceed to
+            Case Matching → Argument Builder.
           </p>
         </div>
       </div>
@@ -232,7 +237,7 @@ function CaseIntake() {
               placeholder="Describe the events chronologically. Who is involved? What agreements were broken? (Min 50 chars)"
               value={caseDescription}
               onChange={(e) => setCaseDescription(e.target.value)}
-            ></textarea>
+            />
           </div>
 
           <h4 style={{ marginTop: '30px', marginBottom: '20px' }}>2. Supporting Documents (Upload for Analysis)</h4>
@@ -245,14 +250,13 @@ function CaseIntake() {
               onClick={triggerFileInput}
             >
               <UploadIcon />
-              <p>Drag & drop files here</p>
-              <span>or click to browse (PDFs, Word Docs)</span>
+              <p>Drag &amp; drop a file here</p>
+              <span>or click to browse (PDF or Word Doc)</span>
             </div>
             <input
               type="file"
               ref={fileInputRef}
               onChange={(e) => handleFileChange(e.target.files)}
-              multiple
               className="file-input-hidden"
               accept=".pdf,.doc,.docx"
             />
@@ -260,120 +264,127 @@ function CaseIntake() {
 
           {files.length > 0 && (
             <div className="file-list">
-              {files.map((file, index) => (
-                <div key={index} className="file-list-item">
+              {files.map((file, idx) => (
+                <div key={idx} className="file-list-item">
                   <div className="file-list-item-info">
                     <FileIcon />
                     <span className="file-name">{file.name}</span>
                   </div>
                   <span className="file-size">
                     ({(file.size / 1024).toFixed(1)} KB)
-                    <button type="button" className="file-remove-btn" onClick={() => handleRemoveFile(file.name)}>&times;</button>
+                    <button
+                      type="button"
+                      className="file-remove-btn"
+                      onClick={() => handleRemoveFile(file.name)}
+                    >&times;</button>
                   </span>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="action" style={{ display: 'flex', gap: '15px', marginTop: '20px' }}>
+          <div className="action" style={{ marginTop: '24px' }}>
             <button
-                onClick={handleAnalyze}
-                className="btn btn-primary"
-                disabled={isAnalyzing}
-                style={{ flex: 1 }}
+              type="button"
+              onClick={handleAnalyze}
+              className="btn btn-primary"
+              disabled={isAnalyzing}
+              style={{ width: '100%' }}
             >
-              {isAnalyzing ? 'Analyzing with AI...' : 'Step 1: Analyze Case'}
+              {isAnalyzing ? '⚖️ Analyzing with AI…' : '⚖️ Analyze Case'}
             </button>
           </div>
 
-          {message && <p style={{ marginTop: '15px', fontWeight: 'bold', color: message.includes('Error') || message.includes('Rejected') ? '#e74c3c' : '#27ae60' }}>{message}</p>}
+          {message && (
+            <p style={{
+              marginTop: '14px',
+              fontWeight: 'bold',
+              color: message.startsWith('Error') || message.startsWith('Case Analysis Rejected') ? '#e74c3c' : '#27ae60',
+            }}>
+              {message}
+            </p>
+          )}
         </form>
       </div>
 
+      {/* ── Analysis Results ── */}
       {analysisResult && (
         <div style={styles.resultBox} className="fade-in-up">
-            <h3 style={styles.heading}>📋 AI Legal Analysis Report</h3>
+          <h3 style={styles.heading}>📋 Analysis Results</h3>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
-                <div style={getStatusStyle(analysisResult.validity_status)}>
-                    Grounding: {analysisResult.validity_status}
-                </div>
-                {analysisResult.validity_status !== "REJECTED" && (
-                    <div style={getStatusStyle(analysisResult.validity_assessment.risk_level)}>
-                        Risk: {analysisResult.validity_assessment.risk_level}
-                    </div>
-                )}
+          <div>
+            <span style={getStatusStyle(analysisResult.validity_status)}>
+              {analysisResult.validity_status}
+            </span>
+            <span style={getStatusStyle(analysisResult.validity_assessment?.risk_level)}>
+              Risk: {analysisResult.validity_assessment?.risk_level || 'N/A'}
+            </span>
+          </div>
+
+          <div style={styles.subHeading}>Case Summary</div>
+          <p style={styles.formattedText}>{analysisResult.case_summary}</p>
+
+          {analysisResult.key_facts?.length > 0 && (
+            <>
+              <div style={styles.subHeading}>Key Facts</div>
+              <ul style={styles.list}>
+                {analysisResult.key_facts.map((fact, idx) => <li key={idx}>{fact}</li>)}
+              </ul>
+            </>
+          )}
+
+          {analysisResult.validity_assessment?.simplified_advice && (
+            <div style={styles.simplifiedBox}>
+              <strong>💡 Plain-Language Advice</strong>
+              <p style={{ ...styles.formattedText, marginTop: '8px' }}>
+                {analysisResult.validity_assessment.simplified_advice}
+              </p>
             </div>
+          )}
 
-            <div>
-                <h4 style={styles.subHeading}>Case Summary</h4>
-                <p style={{ color: '#555', lineHeight: '1.6' }}>{analysisResult.case_summary}</p>
+          {analysisResult.validity_assessment?.advice_summary && (
+            <div style={styles.adviceBox}>
+              <strong>📝 Detailed Legal Advice</strong>
+              <p style={{ ...styles.formattedText, marginTop: '8px' }}>
+                {analysisResult.validity_assessment.advice_summary}
+              </p>
             </div>
+          )}
 
-            {analysisResult.key_facts.length > 0 && (
-                <div>
-                    <h4 style={styles.subHeading}>Key Facts Identified</h4>
-                    <ul style={styles.list}>
-                        {analysisResult.key_facts.map((fact, idx) => (
-                            <li key={idx} style={{ marginBottom: '5px' }}>{fact}</li>
-                        ))}
-                    </ul>
+          <div style={styles.subHeading}>Relevant Laws &amp; Precedents</div>
+          {analysisResult.relevant_laws?.length > 0 ? (
+            analysisResult.relevant_laws.map((law, idx) => (
+              <div key={idx} style={{ backgroundColor: '#f9f9f9', padding: '10px', marginBottom: '10px', borderLeft: '3px solid #ccc', fontSize: '0.9rem' }}>
+                <p style={{ fontStyle: 'italic', margin: 0 }}>"{law.source_text}"</p>
+                <div style={{ marginTop: '5px', fontSize: '0.8rem', color: '#777', fontWeight: 'bold' }}>
+                  Match Score: {(law.relevance_score * 100).toFixed(1)}%
                 </div>
-            )}
+              </div>
+            ))
+          ) : (
+            <p style={{ color: '#999' }}>No specific legal precedents found.</p>
+          )}
 
-            {analysisResult.validity_status !== "REJECTED" && (
-                <>
-                    {/* Task 1: Strategic Advice (Formatted) */}
-                    <div style={styles.adviceBox}>
-                        <h4 style={{ ...styles.subHeading, marginTop: 0, color: '#0056b3' }}>⚖️ Strategic Advice</h4>
-                        <div style={styles.formattedText}>
-                            {analysisResult.validity_assessment.advice_summary}
-                        </div>
-                    </div>
-
-                    {/* Task 2: Simplified Advice */}
-                    <div style={styles.simplifiedBox}>
-                        <h4 style={{ ...styles.subHeading, marginTop: 0, color: '#27ae60' }}>💡 Simply Put (For Laymen)</h4>
-                        <p style={{ color: '#2c3e50', marginBottom: '0', fontSize: '1.05rem' }}>
-                            {analysisResult.validity_assessment.simplified_advice}
-                        </p>
-                    </div>
-                </>
-            )}
-
-            <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
-                <h4 style={styles.subHeading}>Relevant Pakistani Laws</h4>
-                {analysisResult.relevant_laws.length > 0 ? (
-                    analysisResult.relevant_laws.map((law, idx) => (
-                        <div key={idx} style={{ backgroundColor: '#f9f9f9', padding: '10px', marginBottom: '10px', borderLeft: '3px solid #ccc', fontSize: '0.9rem' }}>
-                            <p style={{ fontStyle: 'italic', margin: 0 }}>"{law.source_text}"</p>
-                            <div style={{ marginTop: '5px', fontSize: '0.8rem', color: '#777', fontWeight: 'bold' }}>
-                                Match Score: {(law.relevance_score * 100).toFixed(1)}%
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <p style={{ color: '#999' }}>No specific legal precedents found.</p>
-                )}
+          {/* ── Save & Proceed button ── */}
+          {analysisResult.validity_status !== 'REJECTED' && (
+            <div style={{ textAlign: 'right', marginTop: '30px', borderTop: '1px solid #ecf0f1', paddingTop: '20px' }}>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '12px' }}>
+                ✅ Analysis complete. Save your case and proceed to Case Matching to find relevant precedents.
+              </p>
+              <button
+                onClick={handleSaveAndProceed}
+                className="btn btn-primary"
+                disabled={isSaving}
+                style={{ backgroundColor: '#2c3e50', borderColor: '#2c3e50', padding: '12px 28px', fontSize: '1rem' }}
+              >
+                {isSaving ? '⏳ Saving…' : '💾 Save & Proceed to Case Matching →'}
+              </button>
             </div>
-
-            {analysisResult.validity_status !== "REJECTED" && (
-                <div style={{ textAlign: 'right', marginTop: '30px' }}>
-                    <button
-                        onClick={handleSaveAndProceed}
-                        className="btn btn-primary"
-                        style={{ backgroundColor: '#2c3e50', borderColor: '#2c3e50', padding: '12px 24px' }}
-                    >
-                        Step 2: Save Case & Proceed
-                    </button>
-                </div>
-            )}
+          )}
         </div>
       )}
 
-      <footer>
-        CourtReady FYP - All Rights Reserved © 2025
-      </footer>
+      <footer>CourtReady FYP - All Rights Reserved © 2025</footer>
     </div>
   );
 }
