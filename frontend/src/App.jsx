@@ -4,12 +4,11 @@ import Navbar from './ui/Navbar';
 import Home from './pages/Home';
 import CaseIntake from './pages/CaseIntake';
 import Placeholder from './pages/Placeholder';
-
-// Import the new pages
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
-import ProtectedRoute from './components/ProtectedRoute'; // Import the protector
-import DocumentAssistant from './pages/DocumentAssistant'; // Import the new Document Assistant
+import ProtectedRoute from './components/ProtectedRoute';
+import DocumentAssistant from './pages/DocumentAssistant';
+import CaseMatching from './pages/CaseMatching';   // ← NEW
 import './App.css';
 
 function App() {
@@ -37,6 +36,14 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <Placeholder pageName="Document Assistant" />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/case-matching"
+                        element={
+                            <ProtectedRoute>
+                                <CaseMatching />
                             </ProtectedRoute>
                         }
                     />
