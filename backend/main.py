@@ -18,6 +18,7 @@ import models, schemas, auth
 from database import engine, get_db
 from caseanalyzer import legal_engine
 from casematching import find_similar_cases          # ← NEW
+from argumentbuilder import generate_arguments
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -225,6 +226,31 @@ def upload_documents(
 
     db.commit()
     return {"status": "success", "saved_files": saved_files}
+
+@app.post("/api/build-arguments")
+async def build_arguments(
+        caseDescription: str = Form(...),
+        analysisResult:  str = Form(...),
+        matchingResult:  str = Form(...),
+        current_user: dict = Depends(auth.get_current_user)
+):
+    import json as _json
+    try:
+        analysis = _json.loads(analysisResult)
+        matching = _json.loads(matchingResult)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON in analysisResult or matchingResult.")
+    try:
+        result = await run_in_threadpool(
+            generate_arguments,
+            case_description=caseDescription,
+            analysis_result=analysis,
+            matching_result=matching,
+        )
+        return result
+    except Exception as e:
+        print(f"Argument Builder Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Argument generation failed: {str(e)}")
 
 
 if __name__ == "__main__":
