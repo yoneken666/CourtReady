@@ -50,7 +50,7 @@ class RelevantLaw(BaseModel):
 class ValidityAssessment(BaseModel):
     risk_level: str
     advice_summary: str
-    simplified_advice: str # Task 2: New field for layman explanation
+    simplified_advice: str
 
 class AnalysisResponse(BaseModel):
     case_summary: str
@@ -58,3 +58,16 @@ class AnalysisResponse(BaseModel):
     relevant_laws: List[RelevantLaw]
     validity_status: str
     validity_assessment: ValidityAssessment
+
+# --- CASE MATCHING SCHEMAS ---
+
+class CaseMatchResult(BaseModel):
+    case_label: str              # human-readable: court, year, parties
+    source_file: str             # original PDF filename
+    similarity_percentage: float
+    relevance: str               # "supports" | "opposes" | "neutral"
+    explanation: str
+
+class CaseMatchResponse(BaseModel):
+    top_matches: List[CaseMatchResult]
+    message: str
